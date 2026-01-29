@@ -1,0 +1,35 @@
+# Test data
+test-data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# MLflow
+mlruns/
+mlflow.db
+mlflow.db-shm
+mlflow.db-wal
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

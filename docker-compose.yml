@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mlflow-studio:
+    build:
+      context: .seqera
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - CONNECT_TOOL_PORT=5000
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////workspace/data/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/workspace/data/mlruns
+      - MLFLOW_HOST=0.0.0.0
+    volumes:
+      - ./test-data:/workspace/data
+    entrypoint: /app/start.sh
