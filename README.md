@@ -14,6 +14,11 @@ Run MLflow tracking server as a Seqera Studio with automatic experiment discover
 
 ### Deploy to Seqera Platform
 
+**Prerequisites:**
+- Wave must be configured in your workspace
+- Container repository must be set in Settings → Studios → Container repository
+- Container registry credentials must be configured
+
 1. **Create Studio**
    - Navigate to Workspace → Studios → Create Studio
    - Select "Git repository" as source
@@ -42,6 +47,25 @@ Run MLflow tracking server as a Seqera Studio with automatic experiment discover
 docker-compose up --build
 
 # Access at http://localhost:5000
+```
+
+### Build and Push Manually
+
+If you prefer to build and push the image yourself:
+
+```bash
+# Build the image
+cd .seqera
+docker build --platform linux/amd64 -t ghcr.io/seqeralabs/mlflow-studio:latest .
+
+# Login to GitHub Container Registry
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+
+# Push the image
+docker push ghcr.io/seqeralabs/mlflow-studio:latest
+
+# In Seqera Platform, create Studio using "Container image"
+# Image URI: ghcr.io/seqeralabs/mlflow-studio:latest
 ```
 
 ## Using the Studio
@@ -129,6 +153,17 @@ Studio Container
 ```
 
 ## Troubleshooting
+
+**Build fails with "Attribute `buildRepository` must be specified"**
+- This error occurs when Wave is configured in freeze mode but no container repository is set
+- Solution 1: Configure container repository in workspace settings
+  - Go to Settings → Studios → Container repository
+  - Set repository path (e.g., `docker.io/username/mlflow-studio`)
+  - Add container registry credentials in Credentials section
+- Solution 2: Use a pre-built image
+  - Build locally: `cd .seqera && docker build -t your-registry/mlflow-studio:latest .`
+  - Push to registry: `docker push your-registry/mlflow-studio:latest`
+  - Create Studio using "Container image" instead of "Git repository"
 
 **Studio won't start**
 - Check Wave build logs in Studios → Build reports
