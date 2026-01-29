@@ -24,8 +24,12 @@ Run MLflow tracking server as a Seqera Studio with automatic experiment discover
    - Select "Git repository" as source
 
 2. **Configure Repository**
-   - Repository URL: `https://github.com/YOUR-ORG/mlflow-studio`
-   - Branch: `main`
+   - Repository URL: `https://github.com/seqeralabs/mlflow-studio`
+   - Branch: `master`
+
+   **Or use pre-built image:**
+   - Select "Container image" instead of "Git repository"
+   - Image URI: `skptic/mlflow-studio:latest`
 
 3. **Launch Configuration**
    - CPUs: 2
@@ -56,17 +60,19 @@ If you prefer to build and push the image yourself:
 ```bash
 # Build the image
 cd .seqera
-docker build --platform linux/amd64 -t ghcr.io/seqeralabs/mlflow-studio:latest .
+docker build --platform linux/amd64 -t skptic/mlflow-studio:latest .
 
-# Login to GitHub Container Registry
-echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+# Login to Docker Hub
+docker login
 
 # Push the image
-docker push ghcr.io/seqeralabs/mlflow-studio:latest
+docker push skptic/mlflow-studio:latest
 
 # In Seqera Platform, create Studio using "Container image"
-# Image URI: ghcr.io/seqeralabs/mlflow-studio:latest
+# Image URI: skptic/mlflow-studio:latest
 ```
+
+**Available pre-built image**: `skptic/mlflow-studio:latest` (public on Docker Hub)
 
 ## Using the Studio
 
