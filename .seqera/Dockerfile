@@ -55,6 +55,7 @@ RUN chmod +x /app/*.sh
 ENV MLFLOW_BACKEND_STORE_URI="sqlite:////workspace/data/mlflow.db"
 ENV MLFLOW_DEFAULT_ARTIFACT_ROOT="/workspace/data/mlruns"
 ENV MLFLOW_HOST="0.0.0.0"
+ENV CONNECT_TOOL_PORT="8080"
 
 # Use connect-client as entrypoint
 ENTRYPOINT ["/usr/bin/connect-client", "--entrypoint", "/app/start.sh"]
