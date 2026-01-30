@@ -4,105 +4,66 @@ echo "======================================"
 echo "MLflow Studio Initialization"
 echo "======================================"
 
-# Set default port if CONNECT_TOOL_PORT is not set (Seqera Studios uses 8080)
-if [ -z "$CONNECT_TOOL_PORT" ]; then
-    echo "Warning: CONNECT_TOOL_PORT not set, using default port 8080"
-    CONNECT_TOOL_PORT=8080
-fi
+# Set default port
+CONNECT_TOOL_PORT="${CONNECT_TOOL_PORT:-8080}"
+echo "Port: $CONNECT_TOOL_PORT"
 
-# Debug: Print environment info
+# Debug info
 echo "Environment Info:"
 echo "  PWD: $(pwd)"
 echo "  User: $(whoami)"
-echo "  ID: $(id)"
 echo "  PATH: $PATH"
-PYTHON_PATH=$(which python3 2>/dev/null || echo "not found")
-MLFLOW_PATH=$(which mlflow 2>/dev/null || echo "not found")
-echo "  Python: $PYTHON_PATH"
-echo "  MLflow: $MLFLOW_PATH"
-echo ""
 
-# Verify mlflow is available early
-if [ "$MLFLOW_PATH" = "not found" ]; then
-    echo "ERROR: mlflow command not found in PATH!"
-    echo "Checking /usr/local/bin/:"
-    ls -la /usr/local/bin/ 2>/dev/null || echo "  Cannot list /usr/local/bin/"
+# Check mlflow
+echo ""
+echo "Checking MLflow installation..."
+MLFLOW_PATH=$(which mlflow 2>/dev/null)
+if [ -z "$MLFLOW_PATH" ]; then
+    echo "ERROR: mlflow not found in PATH"
     exit 1
 fi
+echo "  MLflow binary: $MLFLOW_PATH"
 
-# Test mlflow can actually run
-echo "Testing mlflow command..."
-if ! mlflow --version 2>&1; then
-    echo "ERROR: mlflow command exists but cannot run!"
-    exit 1
-fi
+echo "  Testing mlflow --version..."
+mlflow --version 2>&1 || { echo "ERROR: mlflow --version failed"; exit 1; }
+
 echo ""
+echo "Testing mlflow module import..."
+python3 -c "import mlflow; print(f'MLflow version: {mlflow.__version__}')" 2>&1 || { echo "ERROR: Cannot import mlflow"; exit 1; }
 
-# Wait for Fusion mounts to be ready (60 second timeout)
-# Note: Do NOT create /workspace/data manually - Fusion needs to mount it
-TIMEOUT=60
-ELAPSED=0
-echo "Waiting for Fusion mounts at /workspace/data/..."
-
-while [ $ELAPSED -lt $TIMEOUT ]; do
-    if [ -d /workspace/data ]; then
-        # Directory exists (Fusion created it), check if it has content or proceed after 10 seconds
-        CONTENTS=$(ls -A /workspace/data 2>/dev/null || true)
-        if [ -n "$CONTENTS" ] || [ $ELAPSED -ge 10 ]; then
-            if [ -n "$CONTENTS" ]; then
-                echo "Fusion mounts ready (found data)"
-            else
-                echo "Proceeding without mounted data (no data links)"
-            fi
-            break
-        fi
-    fi
-    sleep 2
-    ELAPSED=$((ELAPSED + 2))
-    echo "  Waited ${ELAPSED}s..."
-done
-
-if [ $ELAPSED -ge $TIMEOUT ]; then
-    echo "Warning: Timeout waiting for /workspace/data."
+# Create data directory (simple approach - create under /tmp if /workspace fails)
+echo ""
+echo "Setting up data directories..."
+DATA_DIR="/workspace/data"
+if mkdir -p "$DATA_DIR" 2>/dev/null; then
+    echo "  Using $DATA_DIR"
+else
+    echo "  /workspace/data not writable, using /tmp/mlflow-data"
+    DATA_DIR="/tmp/mlflow-data"
+    mkdir -p "$DATA_DIR"
 fi
 
-# Now create our data directories (after Fusion has set up /workspace)
-echo "Creating MLflow data directories..."
-mkdir -p /workspace/data/mlruns || echo "Warning: Could not create mlruns directory"
+mkdir -p "$DATA_DIR/mlruns"
 
-# Run experiment discovery
-if [ -f /app/discover-experiments.sh ]; then
-    echo "Running experiment discovery..."
-    bash /app/discover-experiments.sh || echo "Warning: Experiment discovery had issues"
-fi
+# Set MLflow paths
+export MLFLOW_BACKEND_STORE_URI="sqlite:///$DATA_DIR/mlflow.db"
+export MLFLOW_DEFAULT_ARTIFACT_ROOT="$DATA_DIR/mlruns"
 
-# Initialize database if needed
-if [[ "$MLFLOW_BACKEND_STORE_URI" == sqlite://* ]]; then
-    DB_PATH="${MLFLOW_BACKEND_STORE_URI#sqlite:///}"
-    DB_DIR=$(dirname "$DB_PATH")
-    if [ ! -f "$DB_PATH" ]; then
-        echo "Initializing new SQLite database at $DB_PATH"
-        mkdir -p "$DB_DIR"
-    else
-        echo "Using existing database at $DB_PATH"
-    fi
-fi
-
-# Display configuration
+echo ""
 echo "======================================"
 echo "MLflow Configuration:"
 echo "  Backend Store: ${MLFLOW_BACKEND_STORE_URI}"
 echo "  Artifact Root: ${MLFLOW_DEFAULT_ARTIFACT_ROOT}"
-echo "  Host: ${MLFLOW_HOST}"
+echo "  Host: 0.0.0.0"
 echo "  Port: ${CONNECT_TOOL_PORT}"
 echo "======================================"
 
-# Start MLflow server
+echo ""
 echo "Starting MLflow server..."
 
-# Start the server (exec replaces the shell process)
+# Run mlflow server
 exec mlflow server \
     --backend-store-uri "${MLFLOW_BACKEND_STORE_URI}" \
     --default-artifact-root "${MLFLOW_DEFAULT_ARTIFACT_ROOT}" \
-    --host "${MLFLOW_HOST}" \
+    --host "0.0.0.0" \
     --port "${CONNECT_TOOL_PORT}"

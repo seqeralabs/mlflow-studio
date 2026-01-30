@@ -48,5 +48,5 @@ ENV MLFLOW_DEFAULT_ARTIFACT_ROOT="/workspace/data/mlruns"
 ENV MLFLOW_HOST="0.0.0.0"
 ENV CONNECT_TOOL_PORT="8080"
 
-# Use connect-client as entrypoint (using simple test script)
-ENTRYPOINT ["/usr/bin/connect-client", "--entrypoint", "/app/start-simple.sh"]
+# Use connect-client as entrypoint
+ENTRYPOINT ["/usr/bin/connect-client", "--entrypoint", "/app/start.sh"]
