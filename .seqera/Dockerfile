@@ -3,43 +3,33 @@ ARG CONNECT_CLIENT_VERSION="0.9.0"
 # Stage 1: Connect Client
 FROM public.cr.seqera.io/platform/connect-client:${CONNECT_CLIENT_VERSION} AS connect
 
-# Stage 2: Python Builder
-FROM python:3.11-slim AS builder
+# Stage 2: Runtime with MLflow installed directly
+FROM python:3.11-slim
 
-# Install build dependencies
+# Install system dependencies including build tools for pip packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install MLflow and dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-    mlflow[extras] \
-    psycopg2-binary \
-    pymysql \
-    boto3
-
-# Stage 3: Runtime
-FROM python:3.11-slim
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install btrfs-progs from Debian backports (required for Seqera mounting)
+# Install btrfs-progs from Debian backports (required for Seqera/Fusion mounting)
 RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > \
     /etc/apt/sources.list.d/backports.list && \
     apt-get update && \
     apt-get install -y -t bookworm-backports btrfs-progs && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy Python packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin/mlflow /usr/local/bin/mlflow
+# Install MLflow and dependencies directly (not via multi-stage copy)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    mlflow \
+    psycopg2-binary \
+    pymysql \
+    boto3
 
-# Copy connect-client
+# Copy connect-client and install
 COPY --from=connect /usr/bin/connect-client /usr/bin/connect-client
 RUN /usr/bin/connect-client --install
 
