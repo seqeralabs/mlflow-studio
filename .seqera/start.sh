@@ -26,8 +26,8 @@ echo "Artifacts: $ARTIFACT_ROOT"
 echo "Port: $PORT"
 echo "======================================"
 
-# Start MLflow UI
-exec mlflow ui \
+# Start MLflow server (gunicorn handles proxy headers correctly)
+exec mlflow server \
     --backend-store-uri "$BACKEND_URI" \
     --default-artifact-root "$ARTIFACT_ROOT" \
     --host "0.0.0.0" \
