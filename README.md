@@ -1,102 +1,58 @@
-# MLflow Studio - Seqera Custom Studio
+# MLflow Studio for Seqera Platform
 
-Run MLflow tracking server as a Seqera Studio with automatic experiment discovery.
+Run MLflow tracking server as a custom Seqera Studio.
 
 ## Features
 
-- **Latest MLflow UI**: Full experiment tracking and visualization
-- **GitHub-to-Live**: Deploy directly from repository
-- **Auto-Discovery**: Automatically finds experiments in mounted data
-- **Persistent Storage**: SQLite backend in mounted workspace
-- **Flexible Configuration**: Environment variable overrides
+- **MLflow Tracking UI**: Full experiment tracking and visualization
+- **Seqera Integration**: Works with connect-client and Fusion mounts
+- **Proxy Compatible**: Handles Seqera's reverse proxy correctly
+- **Persistent Storage**: SQLite backend with optional data link mounting
 
 ## Quick Start
 
-### Deploy to Seqera Platform
-
-**Prerequisites:**
-- Wave must be configured in your workspace
-- Container repository must be set in Settings → Studios → Container repository
-- Container registry credentials must be configured
-
-1. **Create Studio**
-   - Navigate to Workspace → Studios → Create Studio
-   - Select "Git repository" as source
-
-2. **Configure Repository**
-   - Repository URL: `https://github.com/seqeralabs/mlflow-studio`
-   - Branch: `master`
-
-   **Or use pre-built image:**
-   - Select "Container image" instead of "Git repository"
-   - Image URI: `skptic/mlflow-studio:latest`
-
-3. **Launch Configuration**
-   - CPUs: 2
-   - Memory: 4 GB (8 GB recommended for large datasets)
-   - Mount data links with MLflow experiments (optional)
-
-4. **Environment Variables** (Optional)
-   - `MLFLOW_BACKEND_STORE_URI`: Database connection string
-   - `MLFLOW_DEFAULT_ARTIFACT_ROOT`: Artifact storage path
-
-5. **Launch**
-   - Click "Create Studio"
-   - Wait 30-60 seconds for initialization
-
-### Test Locally
+### Option 1: Build with Wave CLI (Recommended)
 
 ```bash
-# Start with docker-compose
+# Install Wave CLI
+brew install seqeralabs/tap/wave-cli
+
+# Build (creates temporary URL valid ~24 hours)
+wave -f .seqera/Dockerfile --context .seqera --platform linux/amd64 --await --tower-token "$TOWER_ACCESS_TOKEN"
+
+# Launch studio with the returned image URL
+tw studios add \
+  --name "MLflow Studio" \
+  -w <org>/<workspace> \
+  --custom-template "<wave-image-url>" \
+  --compute-env "<compute-env-name>" \
+  --auto-start
+```
+
+### Option 2: Use Pre-built Image
+
+```bash
+tw studios add \
+  --name "MLflow Studio" \
+  -w <org>/<workspace> \
+  --custom-template "docker.io/skptic/mlflow-studio:latest" \
+  --compute-env "<compute-env-name>" \
+  --auto-start
+```
+
+### Option 3: Via Seqera Platform UI
+
+1. Navigate to **Studios** → **Add Studio**
+2. Select **Custom image**
+3. Enter image: `docker.io/skptic/mlflow-studio:latest`
+4. Select compute environment
+5. Click **Add** then **Start**
+
+## Test Locally
+
+```bash
 docker-compose up --build
-
 # Access at http://localhost:5000
-```
-
-### Build and Push Manually
-
-If you prefer to build and push the image yourself:
-
-```bash
-# Build the image
-cd .seqera
-docker build --platform linux/amd64 -t skptic/mlflow-studio:latest .
-
-# Login to Docker Hub
-docker login
-
-# Push the image
-docker push skptic/mlflow-studio:latest
-
-# In Seqera Platform, create Studio using "Container image"
-# Image URI: skptic/mlflow-studio:latest
-```
-
-**Available pre-built image**: `skptic/mlflow-studio:latest` (public on Docker Hub)
-
-## Using the Studio
-
-### Viewing Experiments
-
-The MLflow UI automatically displays:
-- All experiments from mounted data links
-- Experiment metrics and parameters
-- Model artifacts and outputs
-
-### Logging New Runs
-
-Connect from Python code:
-
-```python
-import mlflow
-
-# Set tracking URI to your studio
-mlflow.set_tracking_uri("https://<studio-url>")
-
-# Log experiments
-with mlflow.start_run():
-    mlflow.log_param("alpha", 0.5)
-    mlflow.log_metric("rmse", 0.7)
 ```
 
 ## Configuration
@@ -105,87 +61,89 @@ with mlflow.start_run():
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MLFLOW_BACKEND_STORE_URI` | `sqlite:////workspace/data/mlflow.db` | Database connection |
-| `MLFLOW_DEFAULT_ARTIFACT_ROOT` | `/workspace/data/mlruns` | Artifact storage |
-| `MLFLOW_HOST` | `0.0.0.0` | Server host |
-| `CONNECT_TOOL_PORT` | Set by platform | Server port |
+| `MLFLOW_BACKEND_STORE_URI` | `sqlite:////tmp/mlflow/mlflow.db` | Database connection |
+| `MLFLOW_DEFAULT_ARTIFACT_ROOT` | `/tmp/mlflow/mlruns` | Artifact storage |
+| `CONNECT_TOOL_PORT` | `8080` | Server port (set by platform) |
+
+### Persistent Storage with Data Links
+
+By default, MLflow data is stored in `/tmp` and will be lost when the studio stops. For persistent storage:
+
+1. Create a data link pointing to an S3/GCS bucket
+2. Mount the data link when creating the studio
+3. The studio will auto-detect `/workspace/data` and use it for storage
 
 ### Using PostgreSQL Backend
 
-Set environment variable in Studio configuration:
+Set environment variable when creating studio:
 
 ```
 MLFLOW_BACKEND_STORE_URI=postgresql://user:pass@host:5432/mlflowdb
 ```
 
-## Data Organization
-
-### Mounting Existing Experiments
-
-1. Create data link to S3/GCS bucket containing:
-   - `mlruns/` directory (experiment data)
-   - `mlflow.db` (optional SQLite database)
-   - Artifact files
-
-2. Mount data link when creating Studio
-
-3. Override backend URI if needed:
-   ```
-   MLFLOW_BACKEND_STORE_URI=file:///workspace/data/<datalink>/mlruns
-   ```
-
-### Starting Fresh
-
-Default configuration creates new experiments in `/workspace/data/`:
-- Database: `/workspace/data/mlflow.db`
-- Artifacts: `/workspace/data/mlruns/`
-
-Mount a data link to persist this data across sessions.
-
 ## Architecture
 
 ```
-GitHub Repository
-       ↓
-Seqera Platform (Wave build)
+Seqera Platform
        ↓
 Studio Container
-  ├── connect-client (Fusion mounts)
-  ├── start.sh (initialization)
-  │   ├── Wait for mounts
-  │   ├── Discover experiments
-  │   └── Initialize database
-  └── mlflow server (UI + REST API)
+  ├── connect-client (handles Fusion mounts & proxy)
+  ├── gunicorn (WSGI server)
+  │   └── mlflow_app.py (Host header middleware)
+  │       └── mlflow.server.app (Flask app)
+  └── /tmp/mlflow/ or /workspace/data/ (storage)
 ```
+
+### Key Components
+
+- **connect-client**: Seqera's tool that sets up Fusion mounts and proxies HTTP traffic
+- **gunicorn**: Production WSGI server running MLflow
+- **mlflow_app.py**: Middleware that fixes Host header for proxy compatibility
+- **start.sh**: Initialization script that configures and starts the server
 
 ## Troubleshooting
 
-**Build fails with "Attribute `buildRepository` must be specified"**
-- This error occurs when Wave is configured in freeze mode but no container repository is set
-- Solution 1: Configure container repository in workspace settings
-  - Go to Settings → Studios → Container repository
-  - Set repository path (e.g., `docker.io/username/mlflow-studio`)
-  - Add container registry credentials in Credentials section
-- Solution 2: Use a pre-built image
-  - Build locally: `cd .seqera && docker build -t your-registry/mlflow-studio:latest .`
-  - Push to registry: `docker push your-registry/mlflow-studio:latest`
-  - Create Studio using "Container image" instead of "Git repository"
+### "Invalid Host header" Error
 
-**Studio won't start**
-- Check Wave build logs in Studios → Build reports
-- Verify repository URL is accessible
+This is fixed in the current version using WSGI middleware. If you see this error, ensure you're using the latest image.
 
-**No experiments visible**
-- Check data link is mounted correctly
-- Verify `MLFLOW_BACKEND_STORE_URI` path
-- Review container logs for discovery output
+### Studio Won't Start
 
-**Performance issues**
-- Increase memory to 8 GB
-- Consider PostgreSQL for backend (faster than SQLite)
+- Check compute environment is available
+- Verify image URL is accessible
+- Check Platform UI for detailed error logs
+
+### Data Not Persisting
+
+- Mount a data link when creating the studio
+- Verify `/workspace/data` exists inside the container
+- Check the startup logs for storage location
+
+## Development
+
+### Build Persistent Image
+
+```bash
+# Build with Wave (persistent)
+wave -f .seqera/Dockerfile \
+  --context .seqera \
+  --build-repo docker.io/skptic/mlflow-studio \
+  --platform linux/amd64 \
+  --freeze \
+  --await \
+  --tower-token "$TOWER_ACCESS_TOKEN"
+```
+
+### Local Docker Build
+
+```bash
+cd .seqera
+docker build --platform linux/amd64 -t skptic/mlflow-studio:latest .
+docker push skptic/mlflow-studio:latest
+```
 
 ## Resources
 
 - [MLflow Documentation](https://mlflow.org/docs/latest/)
-- [Seqera Studios Guide](https://docs.seqera.io/platform-cloud/studios)
-- [IGV Studio Reference](https://github.com/seqera-services/igv-studio)
+- [Seqera Studios Guide](https://docs.seqera.io/platform/latest/studios)
+- [Wave CLI Documentation](https://docs.seqera.io/wave/)
