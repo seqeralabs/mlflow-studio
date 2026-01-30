@@ -25,6 +25,7 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > \
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     mlflow \
+    gunicorn \
     psycopg2-binary \
     pymysql \
     boto3
