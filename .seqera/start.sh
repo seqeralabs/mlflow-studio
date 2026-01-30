@@ -61,11 +61,9 @@ echo "======================================"
 echo ""
 echo "Starting MLflow server..."
 
-# Run mlflow server with dev settings (single worker, no gunicorn timeout issues)
-exec mlflow server \
+# Run mlflow ui (simpler than mlflow server)
+exec mlflow ui \
     --backend-store-uri "${MLFLOW_BACKEND_STORE_URI}" \
     --default-artifact-root "${MLFLOW_DEFAULT_ARTIFACT_ROOT}" \
     --host "0.0.0.0" \
-    --port "${CONNECT_TOOL_PORT}" \
-    --workers 1 \
-    --gunicorn-opts "--timeout 120"
+    --port "${CONNECT_TOOL_PORT}"
