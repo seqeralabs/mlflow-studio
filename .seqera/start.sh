@@ -1,14 +1,34 @@
 #!/bin/bash
 
-echo "Starting MLflow UI..."
-echo "Port: ${CONNECT_TOOL_PORT:-8080}"
+echo "======================================"
+echo "MLflow Studio"
+echo "======================================"
 
-# Use /tmp for data (definitely writable)
-mkdir -p /tmp/mlflow/mlruns
+PORT="${CONNECT_TOOL_PORT:-8080}"
 
-# Run mlflow ui with minimal config
+# Determine data directory - prefer /workspace/data if it exists
+if [ -d "/workspace/data" ]; then
+    DATA_DIR="/workspace/data"
+    echo "Using Fusion mount: $DATA_DIR"
+else
+    DATA_DIR="/tmp/mlflow"
+    echo "Using local storage: $DATA_DIR"
+fi
+
+mkdir -p "$DATA_DIR/mlruns"
+
+# Configure MLflow
+BACKEND_URI="sqlite:///$DATA_DIR/mlflow.db"
+ARTIFACT_ROOT="$DATA_DIR/mlruns"
+
+echo "Backend: $BACKEND_URI"
+echo "Artifacts: $ARTIFACT_ROOT"
+echo "Port: $PORT"
+echo "======================================"
+
+# Start MLflow UI
 exec mlflow ui \
-    --backend-store-uri "sqlite:////tmp/mlflow/mlflow.db" \
-    --default-artifact-root "/tmp/mlflow/mlruns" \
+    --backend-store-uri "$BACKEND_URI" \
+    --default-artifact-root "$ARTIFACT_ROOT" \
     --host "0.0.0.0" \
-    --port "${CONNECT_TOOL_PORT:-8080}"
+    --port "$PORT"
