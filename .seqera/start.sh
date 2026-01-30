@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 echo "======================================"
 echo "MLflow Studio Initialization"
@@ -15,6 +14,8 @@ fi
 echo "Environment Info:"
 echo "  PWD: $(pwd)"
 echo "  User: $(whoami)"
+echo "  ID: $(id)"
+echo "  PATH: $PATH"
 PYTHON_PATH=$(which python3 2>/dev/null || echo "not found")
 MLFLOW_PATH=$(which mlflow 2>/dev/null || echo "not found")
 echo "  Python: $PYTHON_PATH"
@@ -24,23 +25,28 @@ echo ""
 # Verify mlflow is available early
 if [ "$MLFLOW_PATH" = "not found" ]; then
     echo "ERROR: mlflow command not found in PATH!"
-    echo "PATH: $PATH"
-    ls -la /usr/local/bin/ 2>/dev/null || true
+    echo "Checking /usr/local/bin/:"
+    ls -la /usr/local/bin/ 2>/dev/null || echo "  Cannot list /usr/local/bin/"
     exit 1
 fi
 
-# Create workspace directory structure (connect-client may not have created it yet)
-echo "Ensuring workspace directories exist..."
-mkdir -p /workspace/data
+# Test mlflow can actually run
+echo "Testing mlflow command..."
+if ! mlflow --version 2>&1; then
+    echo "ERROR: mlflow command exists but cannot run!"
+    exit 1
+fi
+echo ""
 
 # Wait for Fusion mounts to be ready (60 second timeout)
+# Note: Do NOT create /workspace/data manually - Fusion needs to mount it
 TIMEOUT=60
 ELAPSED=0
 echo "Waiting for Fusion mounts at /workspace/data/..."
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
     if [ -d /workspace/data ]; then
-        # Directory exists, check if it has content or just proceed after 10 seconds
+        # Directory exists (Fusion created it), check if it has content or proceed after 10 seconds
         CONTENTS=$(ls -A /workspace/data 2>/dev/null || true)
         if [ -n "$CONTENTS" ] || [ $ELAPSED -ge 10 ]; then
             if [ -n "$CONTENTS" ]; then
@@ -53,14 +59,16 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     fi
     sleep 2
     ELAPSED=$((ELAPSED + 2))
+    echo "  Waited ${ELAPSED}s..."
 done
 
 if [ $ELAPSED -ge $TIMEOUT ]; then
-    echo "Warning: Timeout waiting for /workspace/data. Proceeding anyway."
+    echo "Warning: Timeout waiting for /workspace/data."
 fi
 
-# Ensure mlruns directory exists
-mkdir -p /workspace/data/mlruns
+# Now create our data directories (after Fusion has set up /workspace)
+echo "Creating MLflow data directories..."
+mkdir -p /workspace/data/mlruns || echo "Warning: Could not create mlruns directory"
 
 # Run experiment discovery
 if [ -f /app/discover-experiments.sh ]; then
