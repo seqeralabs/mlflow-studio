@@ -37,9 +37,9 @@ RUN /usr/bin/connect-client --install
 # Create app directory
 WORKDIR /app
 
-# Copy startup scripts
+# Copy startup scripts and app wrapper
 COPY start.sh /app/start.sh
-COPY start-simple.sh /app/start-simple.sh
+COPY mlflow_app.py /app/mlflow_app.py
 COPY discover-experiments.sh /app/discover-experiments.sh
 RUN chmod +x /app/*.sh
 
