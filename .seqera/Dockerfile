@@ -1,4 +1,4 @@
-ARG CONNECT_CLIENT_VERSION="0.9.0"
+ARG CONNECT_CLIENT_VERSION="0.15"
 
 # Stage 1: Connect Client
 FROM public.cr.seqera.io/platform/connect-client:${CONNECT_CLIENT_VERSION} AS connect
@@ -29,6 +29,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     psycopg2-binary \
     pymysql \
     boto3
+
+# Label the image with the connect-client version (read by Seqera Platform)
+ARG CONNECT_CLIENT_VERSION
+LABEL io.seqera.connect.version="${CONNECT_CLIENT_VERSION}"
 
 # Copy connect-client and install
 COPY --from=connect /usr/bin/connect-client /usr/bin/connect-client
